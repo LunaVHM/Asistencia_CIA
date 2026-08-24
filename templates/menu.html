@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CIA - Menú Principal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container mt-5 text-center">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card shadow p-5" style="border-radius: 15px; background: white;">
+                    <h2 class="mb-4 text-primary fw-bold">Panel de Control: Sistema CIA</h2>
+                    <p class="text-muted">Bienvenido al menú rápido de administración. Selecciona una acción:</p>
+                    
+                    <div class="d-grid gap-3 my-4">
+                        <a href="/registro" class="btn btn-primary btn-lg fw-bold py-3 shadow-sm">
+                            ➕ Registrar Alumno Nuevo
+                        </a>
+                        
+                        <a href="/permiso" class="btn btn-warning btn-lg fw-bold text-dark py-3 shadow-sm">
+                            🚪 Crear Pase de Salida Temporal
+                        </a>
+                        
+                        <a href="/historial" class="btn btn-dark btn-lg fw-bold py-3 shadow-sm">
+                            📋 Ver Historial y Tiempos
+                        </a>
+                    </div>
+                    
+                    <hr>
+                    <a href="/logout" class="btn btn-outline-danger btn-sm fw-bold px-4 py-2">
+                        ❌ Cerrar Sesión del Sistema
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

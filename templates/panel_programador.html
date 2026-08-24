@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Ingeniería y Configuración - CIA</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container-fluid mt-4 px-4 mb-5">
+        
+        <div class="navbar navbar-dark bg-dark p-3 rounded shadow mb-4 text-white d-flex justify-content-between">
+            <span>⚙️ <b>Panel del Programador / IT Centro</b> | Entorno de Desarrollo Global CIA</span>
+            <a href="/logout" class="btn btn-danger btn-sm fw-bold shadow-sm">Cerrar Sesión</a>
+        </div>
+
+        <div class="row g-4 mb-4">
+            <div class="col-xl-4 col-md-6">
+                <div class="card shadow border-primary h-100">
+                    <div class="card-header bg-primary text-white fw-bold">🏢 Registrar Nuevo Directivo / Administrador</div>
+                    <div class="card-body p-3">
+                        <form id="formDirectivo">
+                            <div class="mb-2">
+                                <label class="form-label small fw-bold mb-0">Clave de Empleado (Usuario)</label>
+                                <input type="text" name="clave" class="form-control form-control-sm" placeholder="Ej. DIR-4021" required autocomplete="off">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small fw-bold mb-0">Nombre Completo</label>
+                                <input type="text" name="nombre" class="form-control form-control-sm" placeholder="Nombre Administrativo" required autocomplete="off">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small fw-bold mb-0">Correo Institucional</label>
+                                <input type="email" name="correo" class="form-control form-control-sm" placeholder="ejemplo@utc.edu.mx" required autocomplete="off">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold mb-0">Contraseña de Acceso</label>
+                                <input type="password" name="contrasena" class="form-control form-control-sm" placeholder="••••••••" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold shadow-sm">Dar de Alta en usuarios_admin</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-4 col-md-6">
+                <div class="card shadow border-success h-100">
+                    <div class="card-header bg-success text-white fw-bold">📅 Configurar Horarios y Cátedras</div>
+                    <div class="card-body p-3">
+                        <form id="formHorario">
+                            <div class="mb-2">
+                                <label class="form-label small fw-bold mb-0">Sección / Grupo Destino</label>
+                                <input type="text" name="seccion" class="form-control form-control-sm" placeholder="Ej. 3AUTOND" required autocomplete="off">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small fw-bold mb-0">Nombre de la Asignatura</label>
+                                <input type="text" name="materia" class="form-control form-control-sm" placeholder="Ej. Integradora I / Circuitos" required autocomplete="off">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold mb-0">Hora Oficial de Entrada</label>
+                                <input type="time" name="hora_entrada" class="form-control form-control-sm" required>
+                            </div>
+                            <button type="submit" class="btn btn-success btn-sm w-100 fw-bold shadow-sm">Inyectar en horarios_clases</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-4 col-md-12">
+                <div class="card shadow border-dark h-100">
+                    <div class="card-header bg-dark text-white fw-bold">📟 Consola de Lectura de Hardware (NFC Logs)</div>
+                    <div class="card-body p-0">
+                        <div class="p-2 bg-light border-bottom">
+                            <input type="text" id="buscadorAccesosDev" class="form-control form-control-sm" placeholder="🔍 Filtrar accesos por matrícula o nombre...">
+                        </div>
+                        <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
+                            <table class="table table-sm table-striped align-middle mb-0" id="tablaAccesosDev">
+                                <thead class="table-secondary sticky-top">
+                                    <tr>
+                                        <th>Alumno</th>
+                                        <th>Fecha / Hora</th>
+                                        <th>Estatus</th>
+                                        <th>Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for acceso in lista_accesos %}
+                                    <tr>
+                                        <td>
+                                            <small class="fw-bold d-block">{{ acceso.nombre }}</small>
+                                            <code class="small text-muted" style="font-size:10px;">{{ acceso.matricula }}</code>
+                                        </td>
+                                        <td class="font-monospace small" style="font-size:11px;">{{ acceso.fecha_hora }}</td>
+                                        <td><span class="badge bg-success small" style="font-size:10px;">{{ acceso.notas if acceso.notas else 'Asistencia' }}</span></td>
+                                        <td>
+                                            <form class="formJustificarDev d-inline">
+                                                <input type="hidden" name="acceso_id" value="{{ acceso.id }}">
+                                                <input type="hidden" name="nuevo_estado" value="Justificado">
+                                                <button type="submit" class="btn btn-warning btn-sm py-0" style="font-size:10px;">Justificar</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted py-3 small">No hay pases NFC registrados por la maqueta hoy.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div> <div class="card shadow">
+            <div class="card-header bg-secondary text-white fw-bold">👥 Rejilla Global de Usuarios Escolares (usuarios_sistema)</div>
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                    <table class="table table-hover table-striped align-middle mb-0">
+                        <thead class="table-dark sticky-top">
+                            <tr>
+                                <th>ID</th>
+                                <th>Matrícula / User</th>
+                                <th>Nombre Completo</th>
+                                <th>Rol</th>
+                                <th>Sección</th>
+                                <th>Aula Base</th>
+                                <th>Llavero NFC Asignado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for usuario in lista_usuarios %}
+                            <tr>
+                                <td>{{ usuario.id }}</td>
+                                <td class="fw-bold text-primary">{{ usuario.username }}</td>
+                                <td>{{ usuario.nombre }}</td>
+                                <td><span class="badge bg-dark">{{ usuario.rol }}</span></td>
+                                <td><span class="badge bg-info text-dark">{{ usuario.seccion if usuario.seccion else '---' }}</span></td>
+                                <td><small class="text-muted">{{ usuario.edificio }} - {{ usuario.salon }}</small></td>
+                                <td>
+                                    {% if usuario.tarjeta_nfc %}
+                                        <code class="text-success fw-bold">{{ usuario.tarjeta_nfc }}</code>
+                                    {% else %}
+                                        <form class="formVincularNfcDev d-flex gap-1 align-items-center">
+                                            <input type="hidden" name="matricula" value="{{ usuario.username }}">
+                                            <input type="text" name="uid_nfc" class="form-control form-control-sm py-0 font-monospace" placeholder="UID NFC" style="max-width: 90px; font-size:11px;" required>
+                                            <button type="submit" class="btn btn-primary btn-sm py-0 fw-bold" style="font-size:11px;">Vincular</button>
+                                        </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Acción 1: Registro de directivos superiores
+        document.getElementById('formDirectivo').addEventListener('submit', function(e){
+            e.preventDefault();
+            fetch('/registrar_directivo', { method: 'POST', body: new FormData(this) })
+            .then(r => r.json()).then(d => { alert(d.message); if(d.status === 'success') this.reset(); });
+        });
+
+        // Acción 2: Asignación de horarios académicos
+        document.getElementById('formHorario').addEventListener('submit', function(e){
+            e.preventDefault();
+            fetch('/asignar_horario', { method: 'POST', body: new FormData(this) })
+            .then(r => r.json()).then(d => { alert(d.message); if(d.status === 'success') this.reset(); });
+        });
+
+        // Acción 3: Justificación e intervención en la bitácora de accesos
+        document.querySelectorAll('.formJustificarDev').forEach(form => {
+            form.addEventListener('submit', function(e){
+                e.preventDefault(); 
+                fetch('/justificar_asistencia', { method: 'POST', body: new FormData(this) })
+                .then(r => r.json()).then(d => { alert(d.message); location.reload(); });
+            });
+        });
+
+        // Acción 4: Enlace y vinculación en vivo de tarjetas NFC
+        document.querySelectorAll('.formVincularNfcDev').forEach(form => {
+            form.addEventListener('submit', function(e){
+                e.preventDefault();
+                fetch('/admin/vincular_nfc', { method: 'POST', body: new FormData(form) })
+                .then(r => r.json()).then(d => { alert(d.mensaje); location.reload(); });
+            });
+        });
+
+        // Buscador interactivo en tiempo real para logs de hardware
+        document.getElementById('buscadorAccesosDev').addEventListener('keyup', function(){
+            let valor = this.value.toLowerCase();
+            let filas = document.querySelectorAll('#tablaAccesosDev tbody tr');
+            filas.forEach(fila => {
+                let textoFila = fila.textContent.toLowerCase();
+                fila.style.display = textoFila.includes(valor) ? "" : "none";
+            });
+        });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

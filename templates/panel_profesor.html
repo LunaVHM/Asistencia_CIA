@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Docencia Avanzada - CIA</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container mt-4 mb-5">
+        
+        <div class="navbar navbar-dark bg-success p-3 rounded shadow mb-4 text-white d-flex justify-content-between">
+            <span>👨‍🏫 <b>Panel de Control Profesor CIA</b> | Bienvenido: {{ session['nombre'] }}</span>
+            <a href="/logout" class="btn btn-danger btn-sm fw-bold shadow-sm">Cerrar Sesión</a>
+        </div>
+
+        <div class="row g-4">
+            
+            <div class="col-md-5">
+                <div class="card shadow border-success mb-4">
+                    <div class="card-header bg-success text-white fw-bold">🧪 Control de Traslados a Laboratorios</div>
+                    <div class="card-body p-4">
+                        <p class="small text-muted">¿Vas a mover a tu grupo a un laboratorio o taller? Genera un QR de autorización grupal temporal:</p>
+                        
+                        <form id="formTraslado">
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Sección / Grupo</label>
+                                <input type="text" name="seccion" class="form-control" placeholder="Ej: 3AUTOND" required autocomplete="off">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Laboratorio de Destino</label>
+                                <select name="laboratorio" class="form-select" required>
+                                    <option value="Laboratorio de Cómputo">Laboratorio de Cómputo / Redes</option>
+                                    <option value="Taller de Automatización">Taller de Automatización / Mechatronics</option>
+                                    <option value="Laboratorio de Idiomas">Laboratorio de Idiomas</option>
+                                    <option value="Taller de Soldadura / PTR">Taller de Soldadura e Industrial</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-success w-100 fw-bold shadow-sm">Generar QR de Traslado Grupal</button>
+                        </form>
+
+                        <div id="cajaQRTraslado" class="text-center mt-4 p-3 bg-white border rounded d-none">
+                            <h6 class="fw-bold text-success">¡Traslado Autorizado!</h6>
+                            <p class="small text-muted">Muestra este código en la compuerta para validar el acceso del grupo:</p>
+                            <img id="imgQRTraslado" src="" alt="QR Grupal" class="img-fluid border p-2 mb-2 shadow-sm" style="max-width: 160px;">
+                            <div class="d-grid mt-2">
+                                <button onclick="window.location.reload();" class="btn btn-outline-secondary btn-sm">Finalizar traslado</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-7">
+                <div class="card shadow mb-4">
+                    <div class="card-header bg-dark text-white fw-bold">📅 Mis Clases y Horarios Asignados</div>
+                    <div class="card-body p-4">
+                        <div class="table-responsive">
+                            <table class="table table-striped align-middle">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Sección</th>
+                                        <th>Asignatura / Materia</th>
+                                        <th>Hora de Entrada</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for clase in lista_clases_profesor %}
+                                    <tr>
+                                        <td class="fw-bold text-primary">{{ clase.seccion }}</td>
+                                        <td>{{ clase.materia }}</td>
+                                        <td class="font-monospace text-success fw-bold">{{ clase.hora_entrada }}</td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="3" class="text-center text-muted py-4">No tienes asignaturas o grupos vinculados en este horario.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div> 
+
+        <hr class="mt-4">
+        <div class="text-start">
+            <a href="/" class="btn btn-primary fw-bold btn-sm">↩️ Volver al Panel Principal</a>
+        </div>
+    </div>
+
+    <script>
+        // Manejo del código QR de traslado grupal
+        document.getElementById('formTraslado').addEventListener('submit', function(e){
+            e.preventDefault(); 
+            fetch('/crear_traslado_laboratorio', { method: 'POST', body: new FormData(this) })
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === 'success'){
+                    document.getElementById('imgQRTraslado').src = data.qr_url;
+                    document.getElementById('cajaQRTraslado').classList.remove('d-none');
+                } else {
+                    alert("Error al generar traslado: " + data.message);
+                }
+            })
+            .catch(err => {
+                alert("Error de red al conectar con el servidor CIA.");
+            });
+        });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

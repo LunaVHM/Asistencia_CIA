@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Panel Alumno - CIA</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background-color: #f4f6f9; font-family: 'Segoe UI', system-ui, sans-serif; }
+        .card { border-radius: 12px; border: none; }
+        .nav-tabs .nav-link { color: #495057; font-weight: 600; }
+        .nav-tabs .nav-link.active { color: #0d6efd; border-bottom: 3px solid #0d6efd; }
+    </style>
+</head>
+<body class="bg-light">
+
+    <div class="container mt-4 mb-5">
+        <div class="navbar navbar-dark bg-primary p-3 rounded shadow mb-4 text-white d-flex justify-content-between align-items-center">
+            <span class="fs-5">
+                <i class="fa-solid fa-graduation-cap me-2"></i> 
+                <b>Portal Alumno CIA</b> | {{ session['nombre'] }} ({{ session['seccion'] }}) | 🏢 Salón Base: <b>{{ session['salon_fijo'] }}</b>
+            </span>
+            <a href="/logout" class="btn btn-danger btn-sm fw-bold shadow-sm">
+                <i class="fa-solid fa-right-from-bracket me-1"></i> Cerrar Sesión
+            </a>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm mb-4" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <ul class="nav nav-tabs mb-4 shadow-sm bg-white rounded p-1" id="tabsAlumno" role="tablist">
+            <li class="nav-item">
+                <button class="nav-link active" id="horario-tab" data-bs-toggle="tab" data-bs-target="#p-horario" type="button" role="tab">
+                    <i class="fa-solid fa-calendar-days me-2"></i>Mi Horario Escolar
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" id="permisos-tab" data-bs-toggle="tab" data-bs-target="#p-permisos" type="button" role="tab">
+                    <i class="fa-solid fa-door-open me-2"></i>Solicitar Pases Rápidos
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" id="grafica-tab" data-bs-toggle="tab" data-bs-target="#p-grafica" type="button" role="tab">
+                    <i class="fa-solid fa-chart-pie me-2"></i>Estadísticas de Asistencia
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="contenidoTabsAlumno">
+            
+            <div class="tab-pane fade show active" id="p-horario" role="tabpanel" aria-labelledby="horario-tab">
+                <div class="card shadow p-4 bg-white">
+                    <h4 class="fw-bold text-dark mb-3"><i class="fa-solid fa-clock text-primary me-2"></i>Agenda Semanal de Clases</h4>
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover align-middle">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Asignatura / Materia</th>
+                                    <th>Catedrático / Profesor</th>
+                                    <th>Día Asignado</th>
+                                    <th>Hora Entrada</th>
+                                    <th>Hora Salida</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if horario_alumno %}
+                                    {% for clase in horario_alumno %}
+                                    <tr>
+                                        <td class="fw-bold text-primary">{{ clase.materia }}</td>
+                                        <td>{{ clase.profesor if clase.profesor else 'Por asignar' }}</td>
+                                        <td><span class="badge bg-secondary">{{ clase.dia_semana }}</span></td>
+                                        <td><span class="badge bg-success font-monospace">{{ clase.hora_inicio }}</span></td>
+                                        <td><span class="badge bg-danger font-monospace">{{ clase.hora_fin }}</span></td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted py-4">
+                                            <i class="fa-solid fa-circle-info fa-2x mb-2 d-block text-muted"></i>
+                                            No se localizaron horarios ni materias cargadas para tu sección académica actual.
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="p-permisos" role="tabpanel" aria-labelledby="permisos-tab">
+                <div class="row g-4">
+                    <div class="col-lg-6">
+                        <div class="card shadow p-4 bg-white">
+                            <h4 class="fw-bold text-success mb-3"><i class="fa-solid fa-file-signature me-2"></i>Autogenerar Pase de Salida</h4>
+                            <p class="text-muted small">Selecciona el justificante oficial. El sistema enviará la autorización a las compuertas de la maqueta.</p>
+                            
+                            <form id="formPaseAlumno">
+                                <input type="hidden" name="matricula" value="{{ session['matricula'] }}">
+                                
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small text-dark">Motivo Escolar o Justificante</label>
+                                    <select name="motivo" id="selectMotivo" class="form-select" required>
+                                        <option value="" disabled selected>-- Elige una justificación --</option>
+                                        <option value="Traslado a Clases de Inglés">Traslado a Edificio de Inglés</option>
+                                        <option value="Olvido de Pertenencias en Vehículo">Olvido de Pertenencias (Estacionamiento)</option>
+                                        <option value="Uso de Sanitarios / Baño">Uso de Sanitarios (Ir al Baño)</option>
+                                        <option value="Trámite Administrativo Escolar">Trámite en Control Escolar / Caja</option>
+                                    </select>
+                                </div>
+
+                                <div id="cajaOlvido" class="mb-3 d-none border p-3 rounded bg-light">
+                                    <label class="form-label fw-bold small text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i>Especifique Destino Exterior</label>
+                                    <input type="text" id="inputDestinoOlvido" name="destino_olvido" class="form-control form-control-sm" placeholder="Ej: Estacionamiento Alumnos / Caseta">
+                                </div>
+
+                                <div id="cajaIngles" class="mb-3 border p-3 rounded bg-light d-none">
+                                    <label class="form-label fw-bold small text-dark"><i class="fa-solid fa-language me-1"></i>Aula / Laboratorio de Destino</label>
+                                    <input type="text" id="inputSalonIngles" name="salon_ingles" class="form-control form-control-sm" placeholder="Ej: Aula Laboratorio Idiomas 2">
+                                </div>
+
+                                <button type="submit" class="btn btn-success w-100 fw-bold shadow-sm py-2">
+                                    <i class="fa-solid fa-qrcode me-2"></i>Generar Código QR Dinámico
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-6">
+                        <div class="card shadow p-4 bg-white text-center d-flex flex-column align-items-center justify-content-center" style="min-height: 340px;">
+                            <h5 class="fw-bold text-dark mb-2">🎟️ Pase Activo en la Plataforma</h5>
+                            <p class="text-muted small px-3">Presenta este token dinámico ante la cámara lectora para liberar o registrar tu regreso.</p>
+                            
+                            <div class="border p-3 bg-light rounded mb-3 d-flex align-items-center justify-content-center shadow-sm" style="width: 210px; height: 210px;">
+                                <img id="imgQR" src="https://placehold.co/200x200/png?text=Esperando+Pase" class="img-fluid rounded" alt="Código QR">
+                            </div>
+                            
+                            <div id="infoTokenContainer" class="d-none animate-fade-in">
+                                <span class="badge bg-dark fs-6 py-2 px-4 font-monospace shadow-sm" id="lblTokenText">PASE-XXXXX</span>
+                                <div class="text-success small fw-bold mt-1"><i class="fa-solid fa-circle-check me-1"></i>¡Registrado y listo para hardware!</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="p-grafica" role="tabpanel" aria-labelledby="grafica-tab">
+                <div class="card shadow p-5 bg-white text-center">
+                    <h4 class="fw-bold text-dark mb-4"><i class="fa-solid fa-chart-bar text-success me-2"></i>Métricas Consolidadas de mi Asistencia</h4>
+                    <p class="text-muted small mb-4">Muestra el acumulado histórico capturado por los lectores físicos NFC de la institución.</p>
+                    <div class="shadow-sm p-3 bg-light border rounded mb-2" style="max-width: 320px; margin: 0 auto;">
+                        <canvas id="graficaAsistenciaAlumno"></canvas>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const selectMotivo = document.getElementById('selectMotivo');
+            const cajaOlvido = document.getElementById('cajaOlvido');
+            const cajaIngles = document.getElementById('cajaIngles');
+            const inputDestinoOlvido = document.getElementById('inputDestinoOlvido');
+            const inputSalonIngles = document.getElementById('inputSalonIngles');
+
+            // Listeners reactivos para alternar sub-paneles en base al justificante
+            selectMotivo.addEventListener('change', function() {
+                cajaOlvido.classList.add('d-none'); 
+                cajaIngles.classList.add('d-none');
+                inputDestinoOlvido.required = false; 
+                inputSalonIngles.required = false;
+                
+                if (this.value.includes('Olvido')) { 
+                    cajaOlvido.classList.remove('d-none'); 
+                    inputDestinoOlvido.required = true; 
+                } 
+                else if (this.value.includes('Inglés')) { 
+                    cajaIngles.classList.remove('d-none'); 
+                    inputSalonIngles.required = true; 
+                }
+            });
+
+            // Enviar formulario asíncronamente vía Fetch API (AJAX)
+            document.getElementById('formPaseAlumno').addEventListener('submit', function(e) {
+                e.preventDefault();
+                let formData = new FormData(this);
+                
+                if (selectMotivo.value.includes('Inglés')) { 
+                    formData.set('salon_origen', "{{ session['salon_fijo'] }}");
+                    formData.set('salon_destino', inputSalonIngles.value); 
+                }
+
+                fetch('/generar_pase', { method: 'POST', body: formData })
+                .then(res => {
+                    if(!res.ok) throw new Error("Falla de red");
+                    return res.json();
+                })
+                .then(data => {
+                    if (data.status === 'success') {
+                        document.getElementById('imgQR').src = data.qr_url;
+                        document.getElementById('infoTokenContainer').classList.remove('d-none');
+                        document.getElementById('lblTokenText').innerText = data.token_generado;
+                        alert("¡Excelente! El pase fue dado de alta en la bitácora escolar.");
+                    } else {
+                        alert("Aviso CIA: " + data.message);
+                    }
+                })
+                .catch(err => {
+                    alert("Error de sincronización: No se pudo enlazar el servidor Flask.");
+                });
+            });
+
+            // --- RENDERING COMPLETAMENTE SEGURO DE CHART.JS (A PRUEBA DE SINTAXIS) ---
+            const canvasElement = document.getElementById('graficaAsistenciaAlumno');
+            if (canvasElement) {
+                // Envolvemos los conteos en Number() y comillas para garantizar compatibilidad con cadenas vacías
+                const asis = Number("{{ conteo_asistencias | default(0) }}");
+                const ret  = Number("{{ conteo_retardos | default(0) }}");
+                const fal  = Number("{{ conteo_faltas | default(0) }}");
+
+                new Chart(canvasElement.getContext('2d'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Asistencias', 'Retardos', 'Faltas'],
+                        datasets: [{
+                            data: [asis, ret, fal],
+                            backgroundColor: ['#198754', '#ffc107', '#dc3545'],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: { 
+                        responsive: true, 
+                        plugins: { 
+                            legend: { 
+                                position: 'bottom' 
+                            } 
+                        } 
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>

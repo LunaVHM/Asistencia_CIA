@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel Directivo Avanzado - CIA</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .alumno-cliqueable:hover {
+            background-color: #e9ecef !important;
+            color: #0d6efd !important;
+            font-weight: bold;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container-fluid mt-4 px-4 mb-5">
+        
+        <div class="navbar navbar-dark bg-dark p-3 rounded shadow mb-4 text-white d-flex justify-content-between">
+            <span>🏛️ <b>Centro de Control General CIA</b> | Administrador: {{ session['nombre'] }}</span>
+            <a href="/logout" class="btn btn-danger btn-sm fw-bold shadow-sm">Cerrar Sesión</a>
+        </div>
+
+        <div class="row g-4">
+            
+            <!-- Columna 1: Alta de Docentes -->
+            <div class="col-xl-3 col-md-6">
+                <div class="card shadow border-primary mb-3">
+                    <div class="card-header bg-primary text-white fw-bold">🍎 Alta de Docentes / Profesores</div>
+                    <div class="card-body p-3">
+                        <form id="formDocente">
+                            <div class="mb-2">
+                                <label class="form-label small fw-bold mb-0">Clave de Profesor</label>
+                                <input type="text" name="username" class="form-control form-control-sm" placeholder="Ej. PROF-5022" required autocomplete="off">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small fw-bold mb-0">Nombre Completo</label>
+                                <input type="text" name="nombre" class="form-control form-control-sm" placeholder="Nombre del Maestro" required autocomplete="off">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small fw-bold mb-0">Correo Institucional</label>
+                                <input type="email" name="correo" class="form-control form-control-sm" placeholder="maestro@utc.edu.mx" required autocomplete="off">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold mb-0">Contraseña Provisional</label>
+                                <input type="password" name="password" class="form-control form-control-sm" placeholder="••••••••" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold shadow-sm">Dar de Alta en Sistema</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Columna 2: Asignación de Salones por Sección -->
+            <div class="col-xl-3 col-md-6">
+                <div class="card shadow border-success mb-3">
+                    <div class="card-header bg-success text-white fw-bold">🏫 Asignar Salón a Sección</div>
+                    <div class="card-body p-3">
+                        <form id="formAsignarAula">
+                            <div class="mb-2">
+                                <label class="form-label small fw-bold mb-0">Sección / Grupo</label>
+                                <input type="text" name="seccion" class="form-control form-control-sm" placeholder="Ej. 3AUTOND" required autocomplete="off">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small fw-bold mb-0">Edificio</label>
+                                <input type="text" name="edificio" class="form-control form-control-sm" placeholder="Ej. Docencia 4" required autocomplete="off">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold mb-0">Nuevo Salón / Aula</label>
+                                <input type="text" name="salon" class="form-control form-control-sm" placeholder="Ej. 109" required autocomplete="off">
+                            </div>
+                            <button type="submit" class="btn btn-success btn-sm w-100 fw-bold shadow-sm">Actualizar Ubicación Grupo</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Columna 3: Comunidad de Alumnos Registrados -->
+            <div class="col-xl-6 col-md-12">
+                <div class="card shadow mb-3">
+                    <div class="card-header bg-secondary text-white fw-bold">🎓 Comunidad de Alumnos Registrados</div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-dark sticky-top">
+                                    <tr>
+                                        <th>Matrícula</th>
+                                        <th>Nombre Completo</th>
+                                        <th>Sección</th>
+                                        <th>Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for alumno in lista_alumnos_directivo %}
+                                    <tr class="alumno-cliqueable" onclick="abrirHistorialIndividual('{{ alumno.username }}', '{{ alumno.nombre }}')">
+                                        <td class="fw-bold">{{ alumno.username }}</td>
+                                        <td>{{ alumno.nombre }}</td>
+                                        <td><span class="badge bg-info text-dark">{{ alumno.seccion }}</span></td>
+                                        <td><button class="btn btn-outline-primary btn-sm py-0 fw-bold">🔍 Analizar</button></td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted py-4">No hay alumnos registrados en la plataforma.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Columna 4: Métrica de Asistencia Institucional -->
+            <div class="col-xl-3 col-md-6">
+                <div class="card shadow text-center mb-3">
+                    <div class="card-header bg-dark text-white fw-bold">📊 Métrica de Asistencia Institucional</div>
+                    <div class="card-body p-3">
+                        <div style="max-width: 240px; margin: 0 auto;">
+                            <canvas id="graficaPlantelGlobal"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div> 
+
+        <hr class="mt-4">
+        <div>
+            <a href="/" class="btn btn-secondary fw-bold btn-sm">↩️ Volver al Panel Principal</a>
+        </div>
+    </div>
+
+    <!-- Modal de Análisis Individual -->
+    <div class="modal fade" id="modalIndividual" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="border-radius: 12px;">
+                <div class="modal-header bg-primary text-white py-2">
+                    <h5 class="modal-title fw-bold id-modal" id="tituloModalAlumno">📊 Historial Global Alumno</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center p-4">
+                    <div style="max-width: 260px; margin: 0 auto;">
+                        <canvas id="graficaPastelIndividual"></canvas>
+                    </div>
+                    <div class="alert alert-light mt-3 p-2 border small" id="resumenModalTexto">
+                        Cargando analíticas en tiempo real del estudiante...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts y Lógica JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const modalIndividual = new bootstrap.Modal(document.getElementById('modalIndividual'));
+        let miGraficaIndividual = null;
+
+        // Alta de Docentes mediante Fetch
+        document.getElementById('formDocente').addEventListener('submit', function(e){
+            e.preventDefault();
+            fetch('/registrar_docente', { method: 'POST', body: new FormData(this) })
+            .then(res => res.json())
+            .then(data => {
+                alert(data.message);
+                if(data.status === 'success') this.reset();
+            });
+        });
+
+        // Asignación de Aula/Salón por Sección mediante Fetch
+        document.getElementById('formAsignarAula').addEventListener('submit', function(e){
+            e.preventDefault();
+            fetch('/admin/asignar_aula', { method: 'POST', body: new FormData(this) })
+            .then(res => res.json())
+            .then(data => {
+                alert(data.message);
+                if(data.status === 'success') {
+                    this.reset();
+                    location.reload(); 
+                }
+            });
+        });
+
+        // Simulación interactiva adaptada del Modal Individual
+        function abrirHistorialIndividual(matricula, nombreCompleto) {
+            document.getElementById('tituloModalAlumno').innerText = `📊 Expediente: ${nombreCompleto}`;
+            document.getElementById('resumenModalTexto').innerText = `Matrícula evaluada: ${matricula}.`;
+            modalIndividual.show();
+
+            setTimeout(() => {
+                const ctxInd = document.getElementById('graficaPastelIndividual').getContext('2d');
+                if(miGraficaIndividual) { miGraficaIndividual.destroy(); }
+
+                miGraficaIndividual = new Chart(ctxInd, {
+                    type: 'pie',
+                    data: {
+                        labels: ['Asistencias', 'Retardos', 'Faltas'],
+                        datasets: [{
+                            data: [12, 2, 1], 
+                            backgroundColor: ['#198754', '#ffc107', '#dc3545'],
+                            borderWidth: 2
+                        }]
+                    },
+                    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+                });
+            }, 250);
+        }
+
+        // Gráfica Global de la Escuela
+        const ctxGlobal = document.getElementById('graficaPlantelGlobal').getContext('2d');
+        new Chart(ctxGlobal, {
+            type: 'doughnut',
+            data: {
+                labels: ['Asistencias Globales', 'Faltas Globales'],
+                datasets: [{
+                    data: [
+                        Number("{{ global_asistencias | default(85) }}"), 
+                        Number("{{ global_faltas | default(15) }}")
+                    ],
+                    backgroundColor: ['#0d6efd', '#6c757d'],
+                    borderWidth: 1
+                }]
+            },
+            options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+        });
+    </script>
+</body>
+</html>

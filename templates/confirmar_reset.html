@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restablecer Cuenta - CIA</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light d-flex align-items-center justify-content-center" style="height: 100vh;">
+<div class="card p-4 shadow text-center" style="width: 380px; border-radius: 12px; background: white;">
+    <h5 class="fw-bold text-dark mb-2">🔑 Nueva Contraseña</h5>
+    <p class="text-muted small">Ingresa el token de un solo uso enviado a: <br><strong class="text-success">{{ correo }}</strong></p>
+    
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-danger p-2 small text-center alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close p-2" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+    
+    <form action="/confirmar_reset" method="POST" id="formReset">
+        <div class="mb-3">
+            <input type="text" 
+                   name="codigo_otp" 
+                   class="form-control text-center fs-4 fw-bold font-monospace" 
+                   placeholder="Código OTP de 4 dígitos" 
+                   maxlength="4" 
+                   pattern="[0-9]{4}" 
+                   inputmode="numeric" 
+                   required 
+                   autocomplete="off" 
+                   autofocus>
+        </div>
+        <div class="mb-3 text-start">
+            <label class="form-label small fw-bold">Escribe tu nueva Contraseña</label>
+            <input type="password" id="nueva_contrasena" name="nueva_contrasena" class="form-control form-control-sm" minlength="6" required>
+        </div>
+        
+        <div class="mb-3 text-start">
+            <label class="form-label small fw-bold">Confirma tu nueva Contraseña</label>
+            <input type="password" id="confirmar_contrasena" class="form-control form-control-sm" required>
+            <div id="error_msg" class="form-text text-danger d-none" style="font-size: 11px;">⚠️ Las contraseñas no coinciden.</div>
+        </div>
+        
+        <button type="submit" id="btnEnviar" class="btn btn-dark w-100 fw-bold py-2 shadow-sm mb-2">Actualizar Credenciales</button>
+        <div class="text-center"><a href="/login" class="small text-secondary text-decoration-none">Cancelar proceso</a></div>
+    </form>
+</div>
+
+<script>
+    const pass = document.getElementById('nueva_contrasena');
+    const confirmPass = document.getElementById('confirmar_contrasena');
+    const errorMsg = document.getElementById('error_msg');
+    const btnEnviar = document.getElementById('btnEnviar');
+
+    function verificarIdentidadClaves() {
+        if (confirmPass.value === "") {
+            errorMsg.classList.add('d-none');
+            btnEnviar.disabled = false;
+        } else if (pass.value !== confirmPass.value) {
+            errorMsg.classList.remove('d-none');
+            btnEnviar.disabled = true;
+        } else {
+            errorMsg.classList.add('d-none');
+            btnEnviar.disabled = false;
+        }
+    }
+
+    pass.addEventListener('input', verificarIdentidadClaves);
+    confirmPass.addEventListener('input', verificarIdentidadClaves);
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

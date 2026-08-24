@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CIA - Generar Permiso Escolar</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                
+                <div class="card shadow mb-4" id="tarjetaFormulario">
+                    <div class="card-header bg-warning text-dark text-center fw-bold py-3">
+                        <h3 class="mb-0">🎫 Generador de Pase de Salida Provisional</h3>
+                    </div>
+                    <div class="card-body p-4">
+                        <form id="formPase">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Matrícula del Alumno</label>
+                                <input type="text" name="matricula" class="form-control" placeholder="Ej. 20260123" required autocomplete="off">
+                                <div class="form-text text-muted">Ingresa la matrícula del estudiante que requiere abandonar el aula.</div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Motivo de Salida Justificado</label>
+                                <select name="motivo" class="form-select" required>
+                                    <option value="Uso de Sanitarios">Uso de Sanitarios (Baño)</option>
+                                    <option value="Visita a Profesor">Visita / Asesoría con un Profesor</option>
+                                    <option value="Asuntos Administrativos">Asuntos Administrativos / Prefectura</option>
+                                    <option value="Emergencia / Otro">Emergencia médica o causa de fuerza mayor</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-warning w-100 fw-bold py-2 mt-2 shadow-sm">Crear Pase y Generar QR Único</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div id="resultadoPase" class="card shadow text-center d-none">
+                    <div class="card-header bg-success text-white fw-bold py-3">
+                        <h4 class="mb-0">🎉 ¡Pase Autorizado con Éxito!</h4>
+                    </div>
+                    <div class="card-body p-4">
+                        <p class="mb-2 fw-bold text-muted">Presenta este Código QR ante el lector óptico de la maqueta:</p>
+                        
+                        <img id="imagenPaseQR" src="" alt="Código QR Salida" class="img-fluid border p-3 bg-white mb-3 shadow-sm" style="max-width: 220px;">
+                        
+                        <div class="alert alert-dark p-2 mb-3">
+                            <small class="text-muted d-block mb-1">Código en texto para depuración / ESP32:</small>
+                            <code id="textoToken" class="fw-bold fs-5 text-warning font-monospace"></code>
+                        </div>
+
+                        <p class="text-danger small fw-bold mb-3">⚠️ Este código quedará inactivo automáticamente al registrar el regreso.</p>
+                        <hr>
+                        <div class="d-grid gap-2">
+                            <button onclick="window.location.reload();" class="btn btn-success fw-bold">➕ Crear Otro Pase de Salida</button>
+                            <a href="/" class="btn btn-outline-secondary btn-sm">Volver al Menú Principal</a>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('formPase').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Enviamos los datos de manera asíncrona a la API de Flask
+            fetch('/generar_pase', { method: 'POST', body: new FormData(this) })
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    // Inyectamos el QR y el token de texto devuelto por app.py
+                    document.getElementById('imagenPaseQR').src = data.qr_url;
+                    document.getElementById('textoToken').innerText = data.token_generado;
+                    
+                    // Intercambiamos la visibilidad de las tarjetas
+                    document.getElementById('resultadoPase').classList.remove('d-none');
+                    document.getElementById('tarjetaFormulario').classList.add('d-none');
+                } else { 
+                    alert("Error de Validación CIA: " + data.message); 
+                }
+            })
+            .catch(err => {
+                alert("Error crítico: No se pudo establecer conexión con el servidor Flask.");
+            });
+        });
+    </script>
+</body>
+</html>
