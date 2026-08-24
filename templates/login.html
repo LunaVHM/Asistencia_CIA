@@ -58,7 +58,7 @@
         
         <div class="text-center">
             <span class="small text-muted">¿Eres alumno de nuevo ingreso?</span><br>
-            <!-- CORREGIDO: Se apunta exactamente al id #modalRegistroAlumno -->
+            <!-- Apunta exactamente al id #modalRegistroAlumno -->
             <button type="button" class="btn btn-link btn-sm fw-bold text-success text-decoration-none p-0" data-bs-toggle="modal" data-bs-target="#modalRegistroAlumno">
                 Regístrate aquí de forma autónoma
             </button>
@@ -82,26 +82,26 @@
                 <form action="/alumnos/solicitar_registro" method="POST" id="formModalRegistro">
                     <div class="mb-3">
                         <label class="form-label fw-bold small">Correo Institucional</label>
-                        <input type="email" name="correo" class="form-control" placeholder="tu_usuario@alumno.utc.edu.mx" required>
+                        <input type="email" name="correo" class="form-control" placeholder="tu_usuario@alumno.utc.edu.mx" required autocomplete="off">
                         <div class="form-text text-muted">Dominio obligatorio @alumno.utc.edu.mx</div>
                     </div>
                     
                     <div class="mb-3">
                         <label class="form-label fw-bold small">Matrícula Escolar</label>
-                        <input type="text" name="matricula" class="form-control" placeholder="Ej: 20260123" required>
+                        <input type="text" name="matricula" class="form-control" placeholder="Ej: 20260123" required autocomplete="off">
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label fw-bold small">Nombre Completo</label>
-                        <input type="text" name="nombre" class="form-control" placeholder="Nombres y Apellidos" required>
+                        <input type="text" name="nombre" class="form-control" placeholder="Nombres y Apellidos" required autocomplete="off">
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label small fw-bold">Sección / Grupo</label>
-                        <input type="text" name="seccion" class="form-control" placeholder="Ej: 3AUTOND" required>
+                        <input type="text" name="seccion" class="form-control" placeholder="Ej: 3AUTOND" required autocomplete="off">
                     </div>
 
-                    <!-- Botones ordenados abajo dentro del flujo normal -->
+                    <!-- Botones de control -->
                     <div class="d-flex justify-content-end gap-2 mt-4">
                         <button type="button" class="btn btn-secondary btn-sm fw-bold px-3" data-bs-dismiss="modal">Cerrar</button>
                         <button type="submit" class="btn btn-success btn-sm fw-bold px-4" id="btnModalEnviar">
@@ -118,9 +118,9 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    // Script seguro opcional para animar el botón del modal al enviar
+    // Script integrado para mostrar el estado de carga al enviar el formulario del modal
     document.getElementById('formModalRegistro').addEventListener('submit', function() {
-        document.getElementById('textoBotonModal').innerText = "Enviando...";
+        document.getElementById('textoBotonModal').innerText = "Procesando...";
         document.getElementById('spinnerModal').classList.remove('d-none');
         document.getElementById('btnModalEnviar').disabled = true;
     });
