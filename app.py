@@ -17,7 +17,7 @@ app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USE_SSL'] = False
 app.config['MAIL_USERNAME'] = 'sistemacia.utc@gmail.com' 
-app.config['MAIL_PASSWORD'] = 'jgryboucichqzaxo' 
+app.config['MAIL_PASSWORD'] = 'qlwffuibuetvfrdn'  # Asegúrate de colocar aquí tu contraseña de aplicación de 16 caracteres de Google
 app.config['MAIL_DEFAULT_SENDER'] = 'sistemacia.utc@gmail.com'
 app.config['MAIL_USE_TIMEOUT'] = True
 app.config['MAIL_TIMEOUT'] = 5
@@ -144,7 +144,7 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
-# --- AUTO-REGISTRO Y OTP ---
+# --- AUTO-REGISTRO Y OTP (PROBADO Y BLINDADO) ---
 @app.route('/alumnos/solicitar_registro', methods=['POST'])
 def solicitar_registro():
     correo = request.form.get('correo').strip()
@@ -154,7 +154,7 @@ def solicitar_registro():
     
     if not correo.endswith('@alumno.utc.edu.mx'):
         flash('Registro denegado. Se requiere un correo con el dominio institucional @alumno.utc.edu.mx', 'danger')
-        return redirect(url_for('mostrar_formulario_registro'))
+        return redirect(url_for('login'))
         
     codigo_otp = str(random.randint(1000, 9999))
     
@@ -171,8 +171,8 @@ def solicitar_registro():
         session['correo_verificando'] = correo
         return redirect(url_for('pantalla_verificar_codigo'))
     except Exception as e:
-        flash('Ocurrió un error al despachar el correo con el código de verificación.', 'danger')
-        return redirect(url_for('mostrar_formulario_registro'))
+        flash(f'Ocurrió un error al despachar el correo: {str(e)}', 'danger')
+        return redirect(url_for('login'))
 
 @app.route('/verificar_codigo', methods=['GET', 'POST'])
 def pantalla_verificar_codigo():
