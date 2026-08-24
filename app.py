@@ -144,14 +144,15 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
-# --- AUTO-REGISTRO Y OTP (PROBADO Y BLINDADO) ---
+# --- AUTO-REGISTRO Y OTP (OPTIMIZADO PARA REDIRECCIÓN DE MODAL) ---
 @app.route('/alumnos/solicitar_registro', methods=['POST'])
 def solicitar_registro():
-    correo = request.form.get('correo').strip()
-    nombre = request.form.get('nombre')
-    matricula = request.form.get('matricula').strip()
-    seccion = request.form.get('seccion').strip() 
+    correo = request.form.get('correo', '').strip().lower()
+    nombre = request.form.get('nombre', '').strip()
+    matricula = request.form.get('matricula', '').strip()
+    seccion = request.form.get('seccion', '').strip() 
     
+    # Validación estricta del dominio institucional
     if not correo.endswith('@alumno.utc.edu.mx'):
         flash('Registro denegado. Se requiere un correo con el dominio institucional @alumno.utc.edu.mx', 'danger')
         return redirect(url_for('login'))
@@ -163,15 +164,22 @@ def solicitar_registro():
         msg.body = f"Hola {nombre},\n\nTu token de validación es: {codigo_otp} \n\nTienes 5 minutos para utilizarlo."
         mail.send(msg)
         
+        # Guardar en estructura temporal en RAM
         registro_temporal[correo] = {
             "codigo": codigo_otp,
             "token_validado": False,
             "datos": {"matricula": matricula, "nombre": nombre, "correo": correo, "seccion": seccion}
         }
+        
+        # Asignar la sesión obligatoria para la siguiente pantalla
         session['correo_verificando'] = correo
+        session.modified = True
+        
+        # Redirección explícita a la ruta de verificación de código
         return redirect(url_for('pantalla_verificar_codigo'))
+        
     except Exception as e:
-        flash(f'Ocurrió un error al despachar el correo: {str(e)}', 'danger')
+        flash(f'Error crítico al despachar el correo: {str(e)}', 'danger')
         return redirect(url_for('login'))
 
 @app.route('/verificar_codigo', methods=['GET', 'POST'])
