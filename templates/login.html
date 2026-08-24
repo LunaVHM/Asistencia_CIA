@@ -58,49 +58,56 @@
         
         <div class="text-center">
             <span class="small text-muted">¿Eres alumno de nuevo ingreso?</span><br>
-            <button type="button" class="btn btn-link btn-sm fw-bold text-success text-decoration-none p-0" data-bs-toggle="modal" data-bs-target="#modalRegistro">
+            <button type="button" class="btn btn-link btn-sm fw-bold text-success text-decoration-none p-0" data-bs-toggle="modal" data-bs-target="#modalRegistroAlumno">
                 Regístrate aquí de forma autónoma
             </button>
         </div>
     </form>
 </div>
 
-<div class="modal fade" id="modalRegistro" tabindex="-1" aria-labelledby="modalRegistroLabel" aria-hidden="true">
+<!-- Modal principal centrado con Bootstrap -->
+<div class="modal fade" id="modalRegistroAlumno" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content" style="border-radius: 12px;">
-            <div class="modal-header text-white py-2">
-                <h6 class="modal-title fw-bold" id="modalRegistroLabel">🎓 Alta de Alumno Nuevo - Validación UTC</h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        <div class="modal-content shadow" style="border-radius: 12px; border: none;">
+            
+            <!-- Cabecera del Modal -->
+            <div class="modal-header bg-warning text-dark py-3">
+                <h5 class="modal-title fw-bold">🎓 Alta de Alumno Nuevo - Validación UTC</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form action="/alumnos/solicitar_registro" method="POST" id="formRegistro">
-                <div class="modal-body py-2">
-                    <div class="mb-2">
-                        <label class="form-label small fw-bold mb-0">Correo Institucional</label>
-                        <input type="email" name="correo" class="form-control form-control-sm" placeholder="tu_usuario@alumno.utc.edu.mx" required autocomplete="off">
-                        <div class="form-text mt-0 opacity-75" style="font-size: 10px;">Dominio obligatorio @alumno.utc.edu.mx</div>
+            
+            <!-- Cuerpo del Formulario -->
+            <div class="modal-body p-4">
+                <form action="/alumnos/solicitar_registro" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Correo Institucional</label>
+                        <input type="email" name="correo" class="form-control" placeholder="tu_usuario@alumno.utc.edu.mx" required>
+                        <div class="form-text text-muted">Dominio obligatorio @alumno.utc.edu.mx</div>
                     </div>
-                    <div class="mb-2">
-                        <label class="form-label small fw-bold mb-0">Matrícula Escolar</label>
-                        <input type="text" name="matricula" class="form-control form-control-sm" placeholder="Ej: 20260123" required autocomplete="off">
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Matrícula Escolar</label>
+                        <input type="text" name="matricula" class="form-control" placeholder="Ej: 20260123" required>
                     </div>
-                    <div class="mb-2">
-                        <label class="form-label small fw-bold mb-0">Nombre Completo</label>
-                        <input type="text" name="nombre" class="form-control form-control-sm" placeholder="Nombres y Apellidos" required autocomplete="off">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Nombre Completo</label>
+                        <input type="text" name="nombre" class="form-control" placeholder="Nombres y Apellidos" required>
                     </div>
-                    <div class="mb-2">
-                        <label class="form-label small fw-bold mb-0">Sección / Grupo</label>
-                        <input type="text" name="seccion" class="form-control form-control-sm" placeholder="Ej: 3AUTOND" required autocomplete="off">
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Sección / Grupo</label>
+                        <input type="text" name="seccion" class="form-control" placeholder="Ej: 3AUTOND" required>
                     </div>
+
+                    <!-- Botones ordenados abajo dentro del flujo normal -->
+                    <div class="d-flex justify-content-end gap-2 mt-4">
+                        <button type="button" class="btn btn-secondary btn-sm fw-bold px-3" data-bs-dismiss="modal">Cerrar</button>
+                        <button type="submit" class="btn btn-success btn-sm fw-bold px-4">Enviar Código</button>
                     </div>
-                </div>
-                <div class="modal-footer bg-light py-1">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
-                    <button type="submit" class="btn btn-success btn-sm fw-bold" id="btnRegistrar" onclick="mostrarCarga()">
-                        <span id="textoBoton">Enviar Código</span>
-                        <span id="spinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
-                    </button>
-                </div>
-            </form>
+                </form>
+            </div>
+
         </div>
     </div>
 </div>
