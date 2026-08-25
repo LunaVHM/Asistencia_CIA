@@ -30,7 +30,7 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 # Conexion a la base de datos
 def conectar_db():
     return mysql.connector.connect(
-        host="MechUTC.mysql.pythonanywhere-services.com", user="MechUTC", password="Mecatronica_UTC", database="MechUTC$sistema_cia"
+        host="MechUTC.mysql.pythonanywhere-services.com", user="MechUTC", password="Luna_LVHM1719", database="MechUTC$sistema_cia"
     )
 
 # Asignación de roles en la ruta raíz
