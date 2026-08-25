@@ -27,7 +27,8 @@ mail = Mail(app)
 app.config['UPLOAD_FOLDER'] = 'static/uploads/justificaciones'
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# Estructuras volátiles en RAM para recuperación de contraseña y control
+# Estructuras volátiles en RAM para control de códigos OTP de registro y recuperación
+registro_temporal = {}
 recuperacion_temporal = {}
 intentos_falidos = {}
 
@@ -143,64 +144,52 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
-# --- AUTO-REGISTRO Y OTP (BASADO EN BASE DE DATOS MYSQl) ---
+# --- AUTO-REGISTRO Y OTP (USANDO MEMORIA RAM - BLINDADO) ---
 @app.route('/alumnos/solicitar_registro', methods=['POST'])
 def solicitar_registro():
-    correo = request.form.get('correo', '').strip().lower()
-    nombre = request.form.get('nombre', '').strip()
-    matricula = request.form.get('matricula', '').strip()
-    seccion = request.form.get('seccion', '').strip() 
-    
-    if not correo.endswith('@alumno.utc.edu.mx'):
-        flash('Registro denegado. Se requiere un correo con el dominio institucional @alumno.utc.edu.mx', 'danger')
-        return redirect(url_for('login'))
-        
-    codigo_otp = str(random.randint(1000, 9999))
-    
-    db = conectar_db()
-    cursor = db.cursor()
     try:
-        # Guardamos provisionalmente los datos en la base de datos usando qr_acceso temporalmente para el código OTP
-        cursor.execute("""
-            INSERT INTO usuarios_sistema (matricula_clave, nombre, correo, contrasena, rol, seccion, qr_acceso) 
-            VALUES (%s, %s, %s, 'PENDIENTE_OTP', 'alumno', %s, %s)
-            ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), correo = VALUES(correo), qr_acceso = VALUES(qr_acceso), seccion = VALUES(seccion)
-        """, (matricula, nombre, correo, seccion, codigo_otp))
-        db.commit()
+        correo = request.form.get('correo', '').strip().lower()
+        nombre = request.form.get('nombre', '').strip()
+        matricula = request.form.get('matricula', '').strip()
+        seccion = request.form.get('seccion', '').strip() 
         
+        if not correo.endswith('@alumno.utc.edu.mx'):
+            flash('Registro denegado. Se requiere un correo con el dominio institucional @alumno.utc.edu.mx', 'danger')
+            return redirect(url_for('login'))
+            
+        codigo_otp = str(random.randint(1000, 9999))
+        
+        # Enviar el correo electrónico mediante Flask-Mail
         msg = Message("Código de Activación C.I.A. - UTC", recipients=[correo])
         msg.body = f"Hola {nombre},\n\nTu token de validación es: {codigo_otp} \n\nTienes 5 minutos para utilizarlo."
         mail.send(msg)
         
+        # Guardar en estructura temporal en RAM
+        registro_temporal[correo] = {
+            "codigo": codigo_otp,
+            "token_validado": False,
+            "datos": {"matricula": matricula, "nombre": nombre, "correo": correo, "seccion": seccion}
+        }
+        
         session['correo_verificando'] = correo
-        session['matricula_verificando'] = matricula
         session.modified = True
         
         return redirect(url_for('pantalla_verificar_codigo'))
+        
     except Exception as e:
-        db.rollback()
-        flash(f'Error al procesar el registro: {str(e)}', 'danger')
+        flash(f'Error al procesar el registro o enviar correo: {str(e)}', 'danger')
         return redirect(url_for('login'))
-    finally:
-        db.close()
 
 @app.route('/verificar_codigo', methods=['GET', 'POST'])
 def pantalla_verificar_codigo():
     correo = session.get('correo_verificando')
-    if not correo:
+    if not correo or correo not in registro_temporal:
         return redirect(url_for('login'))
         
     if request.method == 'POST':
         codigo_ingresado = request.form.get('codigo_otp')
-        
-        db = conectar_db()
-        cursor = db.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM usuarios_sistema WHERE correo = %s", (correo,))
-        usuario = cursor.fetchone()
-        db.close()
-        
-        if usuario and usuario['qr_acceso'] == codigo_ingresado:
-            session['token_validado_ok'] = True
+        if codigo_ingresado == registro_temporal[correo]['codigo']:
+            registro_temporal[correo]['token_validado'] = True
             session.modified = True
             return redirect(url_for('pantalla_asignar_password'))
         else:
@@ -211,16 +200,11 @@ def pantalla_verificar_codigo():
 @app.route('/reenviar_codigo', methods=['POST'])
 def reenviar_codigo():
     correo = session.get('correo_verificando')
-    if not correo:
+    if not correo or correo not in registro_temporal:
         return redirect(url_for('login'))
         
     nuevo_codigo = str(random.randint(1000, 9999))
-    
-    db = conectar_db()
-    cursor = db.cursor()
-    cursor.execute("UPDATE usuarios_sistema SET qr_acceso = %s WHERE correo = %s", (nuevo_codigo, correo))
-    db.commit()
-    db.close()
+    registro_temporal[correo]['codigo'] = nuevo_codigo
     
     try:
         msg = Message("Nuevo Código de Activación C.I.A. - UTC", recipients=[correo])
@@ -235,43 +219,39 @@ def reenviar_codigo():
 @app.route('/asignar_password', methods=['GET', 'POST'])
 def pantalla_asignar_password():
     correo = session.get('correo_verificando')
-    if not correo or not session.get('token_validado_ok'):
+    if not correo or correo not in registro_temporal or not registro_temporal[correo]['token_validado']:
         return redirect(url_for('login'))
         
     if request.method == 'POST':
         nueva_contrasena = request.form.get('contrasena')
+        datos = registro_temporal[correo]['datos']
         password_cifrado = generate_password_hash(nueva_contrasena)
         
         db = conectar_db()
-        cursor = db.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM usuarios_sistema WHERE correo = %s", (correo,))
-        usuario = cursor.fetchone()
-        
-        if usuario:
-            id_usuario = usuario['id_usuario']
-            token_qr = f"ACCESO-{id_usuario}-{random.randint(1000,9999)}"
-            img = qrcode.make(token_qr)
+        cursor = db.cursor()
+        try:
+            # Generar token QR único para el nuevo alumno
+            token_qr = f"ACCESO-{datos['matricula']}-{random.randint(1000,9999)}"
             os.makedirs("static/qrs", exist_ok=True)
+            img = qrcode.make(token_qr)
             img.save(f"static/qrs/{token_qr}.png")
-            
+
             cursor.execute("""
-                UPDATE usuarios_sistema 
-                SET contrasena = %s, qr_acceso = %s 
-                WHERE correo = %s
-            """, (password_cifrado, token_qr, correo))
+                INSERT INTO usuarios_sistema (matricula_clave, nombre, correo, contrasena, rol, seccion, qr_acceso) 
+                VALUES (%s, %s, %s, %s, 'alumno', %s, %s)
+            """, (datos['matricula'], datos['nombre'], datos['correo'], password_cifrado, datos['seccion'], token_qr))
             db.commit()
-            db.close()
             
+            del registro_temporal[correo]
             session.pop('correo_verificando', None)
-            session.pop('token_validado_ok', None)
-            session.pop('matricula_verificando', None)
             
             flash('Cuenta activada correctamente y QR generado. Ya puedes ingresar.', 'success')
             return redirect(url_for('login'))
-        else:
-            db.close()
-            flash('Error de consistencia en la cuenta.', 'danger')
+        except mysql.connector.Error as err:
+            flash(f'Error de consistencia: La matrícula o el correo ya existen. ({err})', 'danger')
             return redirect(url_for('login'))
+        finally:
+            db.close()
             
     return render_template('asignar_password.html', correo=correo)
 
@@ -422,7 +402,7 @@ def solicitar_justificacion():
     msg = Message("Solicitud de Justificación de Inasistencia - CIA UTC", recipients=destinatarios)
     msg.body = f"""Estimado Profesor / Coordinador,
 
-Por medio de la presente, el alumno {session['nombre']} con matrícula {session['matricula']} del grupo {session['seccion']}, solicita la justificación de his inasistencia correspondiente al día {fecha_falta}.
+Por medio de la presente, el alumno {session['nombre']} con matrícula {session['matricula']} del grupo {session['seccion']}, solicita la justificación de su inasistencia correspondiente al día {fecha_falta}.
 
 Motivo expuesto: {motivo}
 
