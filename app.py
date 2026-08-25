@@ -17,7 +17,7 @@ app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USE_SSL'] = False
 app.config['MAIL_USERNAME'] = 'sistemacia.utc@gmail.com' 
-app.config['MAIL_PASSWORD'] = 'qlwffuibuetvfrdn'  # Asegúrate de colocar aquí tu contraseña de aplicación de 16 caracteres de Google
+app.config['MAIL_PASSWORD'] = 'qlwffuibuetvfrdn' 
 app.config['MAIL_DEFAULT_SENDER'] = 'sistemacia.utc@gmail.com'
 app.config['MAIL_USE_TIMEOUT'] = True
 app.config['MAIL_TIMEOUT'] = 5
@@ -27,8 +27,7 @@ mail = Mail(app)
 app.config['UPLOAD_FOLDER'] = 'static/uploads/justificaciones'
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# Estructuras volátiles en RAM para control de códigos OTP
-registro_temporal = {}
+# Estructuras volátiles en RAM para recuperación de contraseña y control
 recuperacion_temporal = {}
 intentos_falidos = {}
 
@@ -144,7 +143,7 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
-# --- AUTO-REGISTRO Y OTP (OPTIMIZADO PARA REDIRECCIÓN DE MODAL) ---
+# --- AUTO-REGISTRO Y OTP (BASADO EN BASE DE DATOS MYSQl) ---
 @app.route('/alumnos/solicitar_registro', methods=['POST'])
 def solicitar_registro():
     correo = request.form.get('correo', '').strip().lower()
@@ -152,46 +151,57 @@ def solicitar_registro():
     matricula = request.form.get('matricula', '').strip()
     seccion = request.form.get('seccion', '').strip() 
     
-    # Validación estricta del dominio institucional
     if not correo.endswith('@alumno.utc.edu.mx'):
         flash('Registro denegado. Se requiere un correo con el dominio institucional @alumno.utc.edu.mx', 'danger')
         return redirect(url_for('login'))
         
     codigo_otp = str(random.randint(1000, 9999))
     
+    db = conectar_db()
+    cursor = db.cursor()
     try:
+        # Guardamos provisionalmente los datos en la base de datos usando qr_acceso temporalmente para el código OTP
+        cursor.execute("""
+            INSERT INTO usuarios_sistema (matricula_clave, nombre, correo, contrasena, rol, seccion, qr_acceso) 
+            VALUES (%s, %s, %s, 'PENDIENTE_OTP', 'alumno', %s, %s)
+            ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), correo = VALUES(correo), qr_acceso = VALUES(qr_acceso), seccion = VALUES(seccion)
+        """, (matricula, nombre, correo, seccion, codigo_otp))
+        db.commit()
+        
         msg = Message("Código de Activación C.I.A. - UTC", recipients=[correo])
         msg.body = f"Hola {nombre},\n\nTu token de validación es: {codigo_otp} \n\nTienes 5 minutos para utilizarlo."
         mail.send(msg)
         
-        # Guardar en estructura temporal en RAM
-        registro_temporal[correo] = {
-            "codigo": codigo_otp,
-            "token_validado": False,
-            "datos": {"matricula": matricula, "nombre": nombre, "correo": correo, "seccion": seccion}
-        }
-        
-        # Asignar la sesión obligatoria para la siguiente pantalla
         session['correo_verificando'] = correo
+        session['matricula_verificando'] = matricula
         session.modified = True
         
-        # Redirección explícita a la ruta de verificación de código
         return redirect(url_for('pantalla_verificar_codigo'))
-        
     except Exception as e:
-        flash(f'Error crítico al despachar el correo: {str(e)}', 'danger')
+        db.rollback()
+        flash(f'Error al procesar el registro: {str(e)}', 'danger')
         return redirect(url_for('login'))
+    finally:
+        db.close()
 
 @app.route('/verificar_codigo', methods=['GET', 'POST'])
 def pantalla_verificar_codigo():
     correo = session.get('correo_verificando')
-    if not correo or correo not in registro_temporal:
+    if not correo:
         return redirect(url_for('login'))
         
     if request.method == 'POST':
         codigo_ingresado = request.form.get('codigo_otp')
-        if codigo_ingresado == registro_temporal[correo]['codigo']:
-            registro_temporal[correo]['token_validado'] = True
+        
+        db = conectar_db()
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM usuarios_sistema WHERE correo = %s", (correo,))
+        usuario = cursor.fetchone()
+        db.close()
+        
+        if usuario and usuario['qr_acceso'] == codigo_ingresado:
+            session['token_validado_ok'] = True
+            session.modified = True
             return redirect(url_for('pantalla_asignar_password'))
         else:
             flash('El código OTP ingresado es incorrecto.', 'danger')
@@ -201,11 +211,16 @@ def pantalla_verificar_codigo():
 @app.route('/reenviar_codigo', methods=['POST'])
 def reenviar_codigo():
     correo = session.get('correo_verificando')
-    if not correo or correo not in registro_temporal:
+    if not correo:
         return redirect(url_for('login'))
         
     nuevo_codigo = str(random.randint(1000, 9999))
-    registro_temporal[correo]['codigo'] = nuevo_codigo
+    
+    db = conectar_db()
+    cursor = db.cursor()
+    cursor.execute("UPDATE usuarios_sistema SET qr_acceso = %s WHERE correo = %s", (nuevo_codigo, correo))
+    db.commit()
+    db.close()
     
     try:
         msg = Message("Nuevo Código de Activación C.I.A. - UTC", recipients=[correo])
@@ -220,32 +235,43 @@ def reenviar_codigo():
 @app.route('/asignar_password', methods=['GET', 'POST'])
 def pantalla_asignar_password():
     correo = session.get('correo_verificando')
-    if not correo or correo not in registro_temporal or not registro_temporal[correo]['token_validado']:
+    if not correo or not session.get('token_validado_ok'):
         return redirect(url_for('login'))
         
     if request.method == 'POST':
         nueva_contrasena = request.form.get('contrasena')
-        datos = registro_temporal[correo]['datos']
         password_cifrado = generate_password_hash(nueva_contrasena)
         
         db = conectar_db()
-        cursor = db.cursor()
-        try:
-            cursor.execute("""
-                INSERT INTO usuarios_sistema (matricula_clave, nombre, correo, contrasena, rol, seccion) 
-                VALUES (%s, %s, %s, %s, 'alumno', %s)
-            """, (datos['matricula'], datos['nombre'], datos['correo'], password_cifrado, datos['seccion']))
-            db.commit()
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM usuarios_sistema WHERE correo = %s", (correo,))
+        usuario = cursor.fetchone()
+        
+        if usuario:
+            id_usuario = usuario['id_usuario']
+            token_qr = f"ACCESO-{id_usuario}-{random.randint(1000,9999)}"
+            img = qrcode.make(token_qr)
+            os.makedirs("static/qrs", exist_ok=True)
+            img.save(f"static/qrs/{token_qr}.png")
             
-            del registro_temporal[correo]
-            session.pop('correo_verificando', None)
-            flash('Cuenta activada correctamente. Ya puedes ingresar.', 'success')
-            return redirect(url_for('login'))
-        except mysql.connector.Error:
-            flash('Error de consistencia: La matrícula o el correo ya existen.', 'danger')
-            return redirect(url_for('login'))
-        finally:
+            cursor.execute("""
+                UPDATE usuarios_sistema 
+                SET contrasena = %s, qr_acceso = %s 
+                WHERE correo = %s
+            """, (password_cifrado, token_qr, correo))
+            db.commit()
             db.close()
+            
+            session.pop('correo_verificando', None)
+            session.pop('token_validado_ok', None)
+            session.pop('matricula_verificando', None)
+            
+            flash('Cuenta activada correctamente y QR generado. Ya puedes ingresar.', 'success')
+            return redirect(url_for('login'))
+        else:
+            db.close()
+            flash('Error de consistencia en la cuenta.', 'danger')
+            return redirect(url_for('login'))
             
     return render_template('asignar_password.html', correo=correo)
 
@@ -296,6 +322,7 @@ def confirmar_reset():
             password_cifrado = generate_password_hash(password_nuevo)
             token_qr = f"ACCESO-{datos_reset['user_id']}-{random.randint(1000,9999)}"
             img = qrcode.make(token_qr)
+            os.makedirs("static/qrs", exist_ok=True)
             img.save(f"static/qrs/{token_qr}.png")
             
             db = conectar_db()
@@ -395,7 +422,7 @@ def solicitar_justificacion():
     msg = Message("Solicitud de Justificación de Inasistencia - CIA UTC", recipients=destinatarios)
     msg.body = f"""Estimado Profesor / Coordinador,
 
-Por medio de la presente, el alumno {session['nombre']} con matrícula {session['matricula']} del grupo {session['seccion']}, solicita la justificación de su inasistencia correspondiente al día {fecha_falta}.
+Por medio de la presente, el alumno {session['nombre']} con matrícula {session['matricula']} del grupo {session['seccion']}, solicita la justificación de his inasistencia correspondiente al día {fecha_falta}.
 
 Motivo expuesto: {motivo}
 
@@ -452,6 +479,7 @@ def generar_pase_salida():
     token = f"SALIDA-{matricula}-{random.randint(100000, 999999)}"
     
     try:
+        os.makedirs("static/qrs", exist_ok=True)
         img = qrcode.make(token)
         img.save(f"static/qrs/{token}.png")
         qr_url = f"/static/qrs/{token}.png"
@@ -638,6 +666,7 @@ def crear_traslado_laboratorio():
     token_traslado = f"TRASLADO-{seccion}-{random.randint(1000, 9999)}"
     
     try:
+        os.makedirs("static/qrs", exist_ok=True)
         img = qrcode.make(token_traslado)
         img.save(f"static/qrs/{token_traslado}.png")
         db = conectar_db()
