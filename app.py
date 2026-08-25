@@ -27,11 +27,6 @@ mail = Mail(app)
 app.config['UPLOAD_FOLDER'] = 'static/uploads/justificaciones'
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# Estructuras volátiles en RAM para control de códigos OTP de registro y recuperación
-registro_temporal = {}
-recuperacion_temporal = {}
-intentos_falidos = {}
-
 # Conexion a la base de datos
 def conectar_db():
     return mysql.connector.connect(
@@ -144,7 +139,7 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
-# --- AUTO-REGISTRO Y OTP (USANDO MEMORIA RAM - BLINDADO) ---
+# --- AUTO-REGISTRO Y OTP (USANDO SESIONES BLINDADAS) ---
 @app.route('/alumnos/solicitar_registro', methods=['POST'])
 def solicitar_registro():
     try:
@@ -159,19 +154,20 @@ def solicitar_registro():
             
         codigo_otp = str(random.randint(1000, 9999))
         
-        # Enviar el correo electrónico mediante Flask-Mail
+        # Enviar el correo electrónico
         msg = Message("Código de Activación C.I.A. - UTC", recipients=[correo])
         msg.body = f"Hola {nombre},\n\nTu token de validación es: {codigo_otp} \n\nTienes 5 minutos para utilizarlo."
         mail.send(msg)
         
-        # Guardar en estructura temporal en RAM
-        registro_temporal[correo] = {
+        # Guardamos TODO en la sesión (adiós problema de memoria RAM de PythonAnywhere)
+        session['registro_data'] = {
             "codigo": codigo_otp,
             "token_validado": False,
-            "datos": {"matricula": matricula, "nombre": nombre, "correo": correo, "seccion": seccion}
+            "matricula": matricula, 
+            "nombre": nombre, 
+            "correo": correo, 
+            "seccion": seccion
         }
-        
-        session['correo_verificando'] = correo
         session.modified = True
         
         return redirect(url_for('pantalla_verificar_codigo'))
@@ -182,32 +178,36 @@ def solicitar_registro():
 
 @app.route('/verificar_codigo', methods=['GET', 'POST'])
 def pantalla_verificar_codigo():
-    correo = session.get('correo_verificando')
-    if not correo or correo not in registro_temporal:
+    datos_registro = session.get('registro_data')
+    
+    if not datos_registro:
         return redirect(url_for('login'))
         
     if request.method == 'POST':
         codigo_ingresado = request.form.get('codigo_otp')
-        if codigo_ingresado == registro_temporal[correo]['codigo']:
-            registro_temporal[correo]['token_validado'] = True
+        if codigo_ingresado == datos_registro['codigo']:
+            datos_registro['token_validado'] = True
+            session['registro_data'] = datos_registro
             session.modified = True
             return redirect(url_for('pantalla_asignar_password'))
         else:
             flash('El código OTP ingresado es incorrecto.', 'danger')
             
-    return render_template('verificar_codigo.html', correo=correo)
+    return render_template('verificar_codigo.html', correo=datos_registro['correo'])
 
 @app.route('/reenviar_codigo', methods=['POST'])
 def reenviar_codigo():
-    correo = session.get('correo_verificando')
-    if not correo or correo not in registro_temporal:
+    datos_registro = session.get('registro_data')
+    if not datos_registro:
         return redirect(url_for('login'))
         
     nuevo_codigo = str(random.randint(1000, 9999))
-    registro_temporal[correo]['codigo'] = nuevo_codigo
+    datos_registro['codigo'] = nuevo_codigo
+    session['registro_data'] = datos_registro
+    session.modified = True
     
     try:
-        msg = Message("Nuevo Código de Activación C.I.A. - UTC", recipients=[correo])
+        msg = Message("Nuevo Código de Activación C.I.A. - UTC", recipients=[datos_registro['correo']])
         msg.body = f"Hola, tu nuevo token de validación es: {nuevo_codigo}"
         mail.send(msg)
         flash('Se ha reenviado un nuevo código a tu correo institucional.', 'info')
@@ -218,20 +218,20 @@ def reenviar_codigo():
 
 @app.route('/asignar_password', methods=['GET', 'POST'])
 def pantalla_asignar_password():
-    correo = session.get('correo_verificando')
-    if not correo or correo not in registro_temporal or not registro_temporal[correo]['token_validado']:
+    datos_registro = session.get('registro_data')
+    
+    if not datos_registro or not datos_registro.get('token_validado'):
         return redirect(url_for('login'))
         
     if request.method == 'POST':
         nueva_contrasena = request.form.get('contrasena')
-        datos = registro_temporal[correo]['datos']
         password_cifrado = generate_password_hash(nueva_contrasena)
         
         db = conectar_db()
         cursor = db.cursor()
         try:
             # Generar token QR único para el nuevo alumno
-            token_qr = f"ACCESO-{datos['matricula']}-{random.randint(1000,9999)}"
+            token_qr = f"ACCESO-{datos_registro['matricula']}-{random.randint(1000,9999)}"
             os.makedirs("static/qrs", exist_ok=True)
             img = qrcode.make(token_qr)
             img.save(f"static/qrs/{token_qr}.png")
@@ -239,21 +239,21 @@ def pantalla_asignar_password():
             cursor.execute("""
                 INSERT INTO usuarios_sistema (matricula_clave, nombre, correo, contrasena, rol, seccion, qr_acceso) 
                 VALUES (%s, %s, %s, %s, 'alumno', %s, %s)
-            """, (datos['matricula'], datos['nombre'], datos['correo'], password_cifrado, datos['seccion'], token_qr))
+            """, (datos_registro['matricula'], datos_registro['nombre'], datos_registro['correo'], password_cifrado, datos_registro['seccion'], token_qr))
             db.commit()
             
-            del registro_temporal[correo]
-            session.pop('correo_verificando', None)
+            # Limpiamos la sesión de registro porque ya terminó exitosamente
+            session.pop('registro_data', None)
             
-            flash('Cuenta activada correctamente y QR generado. Ya puedes ingresar.', 'success')
+            flash('Cuenta activada correctamente y QR generado. Ya puedes iniciar sesión.', 'success')
             return redirect(url_for('login'))
         except mysql.connector.Error as err:
-            flash(f'Error de consistencia: La matrícula o el correo ya existen. ({err})', 'danger')
+            flash(f'Error: La matrícula o el correo ya se encuentran registrados. ({err})', 'danger')
             return redirect(url_for('login'))
         finally:
             db.close()
             
-    return render_template('asignar_password.html', correo=correo)
+    return render_template('asignar_password.html', correo=datos_registro['correo'])
 
 @app.route('/recuperar_password', methods=['GET', 'POST'])
 def recuperar_password():
@@ -278,8 +278,13 @@ def recuperar_password():
                 msg.body = f"Hola,\n\nTu código de reinicio es: {codigo_reset}"
                 mail.send(msg)
                 
-                recuperacion_temporal[destino_correo] = {"codigo": codigo_reset, "user_id": usuario.get('id_usuario', usuario.get('id')), "tabla": tabla_origen}
-                session['correo_reseteando'] = destino_correo
+                session['reset_data'] = {
+                    "codigo": codigo_reset, 
+                    "user_id": usuario.get('id_usuario', usuario.get('id')), 
+                    "tabla": tabla_origen,
+                    "correo": destino_correo
+                }
+                session.modified = True
                 return redirect(url_for('confirmar_reset'))
             except Exception:
                 flash('Falla del servidor SMTP al despachar el e-mail.', 'danger')
@@ -289,14 +294,13 @@ def recuperar_password():
 
 @app.route('/confirmar_reset', methods=['GET', 'POST'])
 def confirmar_reset():
-    correo = session.get('correo_reseteando')
-    if not correo or correo not in recuperacion_temporal: 
+    datos_reset = session.get('reset_data')
+    if not datos_reset: 
         return redirect(url_for('login'))
         
     if request.method == 'POST':
         codigo = request.form.get('codigo_otp')
         password_nuevo = request.form.get('nueva_contrasena')
-        datos_reset = recuperacion_temporal[correo]
         
         if codigo == datos_reset['codigo']:
             password_cifrado = generate_password_hash(password_nuevo)
@@ -312,12 +316,12 @@ def confirmar_reset():
             db.commit()
             db.close()
             
-            del recuperacion_temporal[correo]
+            session.pop('reset_data', None)
             flash('Su contraseña ha sido restablecida y su QR de acceso generado.', 'success')
             return redirect(url_for('login'))
         else:
             flash('Código OTP incorrecto.', 'danger')
-    return render_template('confirmar_reset.html', correo=correo)
+    return render_template('confirmar_reset.html', correo=datos_reset['correo'])
 
 # --- DASHBOARD DEL ALUMNO ---
 @app.route('/alumno/dashboard')
