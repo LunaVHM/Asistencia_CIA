@@ -27,13 +27,16 @@ mail = Mail(app)
 app.config['UPLOAD_FOLDER'] = 'static/uploads/justificaciones'
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# Conexion a la base de datos
+# --- CONEXIÓN A LA BASE DE DATOS ---
 def conectar_db():
     return mysql.connector.connect(
-        host="MechUTC.mysql.pythonanywhere-services.com", user="MechUTC", password="Luna_LVHM1719", database="MechUTC$sistema_cia"
+        host="MechUTC.mysql.pythonanywhere-services.com", 
+        user="MechUTC", 
+        password="Luna_LVHM1719",  # Asegúrate de que sea tu contraseña real de MySQL en PythonAnywhere
+        database="MechUTC$sistema_cia"
     )
 
-# Asignación de roles en la ruta raíz
+# --- RUTA RAÍZ ---
 @app.route('/')
 def index():
     if not session.get('logged_in'):
@@ -139,7 +142,7 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
-# --- AUTO-REGISTRO Y OTP (ADAPTADO A TABLA 'usuarios') ---
+# --- AUTO-REGISTRO Y OTP (SESIONES BLINDADAS) ---
 @app.route('/alumnos/solicitar_registro', methods=['POST'])
 def solicitar_registro():
     try:
@@ -224,7 +227,6 @@ def pantalla_asignar_password():
         nueva_contrasena = request.form.get('contrasena')
         password_cifrado = generate_password_hash(nueva_contrasena)
         
-        # Generar token y archivo QR único guardándolo en la tabla 'usuarios'
         token_qr = f"ACCESO-{datos_registro['matricula']}-{random.randint(1000,9999)}"
         os.makedirs("static/qrs", exist_ok=True)
         img = qrcode.make(token_qr)
@@ -234,9 +236,9 @@ def pantalla_asignar_password():
         cursor = db.cursor()
         try:
             cursor.execute("""
-                INSERT INTO usuarios (matricula, nombre, correo, contrasena, rol, codigo_qr, primer_ingreso) 
-                VALUES (%s, %s, %s, %s, 'alumno', %s, 0)
-            """, (datos_registro['matricula'], datos_registro['nombre'], datos_registro['correo'], password_cifrado, token_qr))
+                INSERT INTO usuarios (matricula, nombre, correo, contrasena, rol, seccion, codigo_qr, primer_ingreso) 
+                VALUES (%s, %s, %s, %s, 'alumno', %s, %s, 0)
+            """, (datos_registro['matricula'], datos_registro['nombre'], datos_registro['correo'], password_cifrado, datos_registro['seccion'], token_qr))
             db.commit()
             
             session.pop('registro_data', None)
@@ -246,7 +248,7 @@ def pantalla_asignar_password():
             
         except mysql.connector.Error as err:
             db.rollback()
-            flash(f'Error al registrar en la base de datos: La matrícula o el correo ya existen. ({err})', 'danger')
+            flash(f'Error al registrar en la base de datos: ({err})', 'danger')
             return redirect(url_for('login'))
         finally:
             db.close()
@@ -309,7 +311,6 @@ def confirmar_reset():
             
             db = conectar_db()
             cursor = db.cursor()
-            id_columna = "id" if datos_reset['tabla'] == "usuarios" else "id"
             
             if datos_reset['tabla'] == "usuarios":
                 cursor.execute(f"UPDATE usuarios SET contrasena = %s, primer_ingreso = 0, codigo_qr = %s WHERE id = %s", (password_cifrado, token_qr, datos_reset['user_id']))
@@ -685,7 +686,7 @@ def panel_programador():
         
     try:
         cursor.execute("""
-            SELECT id, matricula AS username, nombre, rol, codigo_qr AS qr, uid_nfc AS tarjeta_nfc
+            SELECT id, matricula AS username, nombre, rol, seccion, edificio, salon_fijo AS salon, codigo_qr AS qr, uid_nfc AS tarjeta_nfc
             FROM usuarios
             ORDER BY rol, nombre ASC
         """)
