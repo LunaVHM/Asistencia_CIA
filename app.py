@@ -73,7 +73,7 @@ def ver_historial():
         SELECT p.id, p.matricula, u.nombre, p.motivo, p.token_qr AS codigo_qr, 
                p.fecha_creacion AS hora_inicio, NULL AS hora_fin, p.estatus AS estado
         FROM permisos_salida p
-        LEFT JOIN usuarios_sistema u ON p.matricula = u.matricula_clave
+        LEFT JOIN usuarios u ON p.matricula = u.matricula
         ORDER BY p.id DESC LIMIT 50
     """)
     lista_permisos = cursor.fetchall()
@@ -82,7 +82,7 @@ def ver_historial():
         cursor.execute("""
             SELECT a.id, a.matricula, u.nombre, u.seccion, a.salon, a.fecha_hora, a.notas
             FROM asistencias_nfc a
-            LEFT JOIN usuarios_sistema u ON a.matricula = u.matricula_clave
+            LEFT JOIN usuarios u ON a.matricula = u.matricula
             ORDER BY a.fecha_hora DESC LIMIT 50
         """)
         lista_accesos = cursor.fetchall()
@@ -102,14 +102,14 @@ def login():
         db = conectar_db()
         cursor = db.cursor(dictionary=True)
         
-        cursor.execute("SELECT * FROM usuarios_sistema WHERE matricula_clave = %s", (identificador,))
+        cursor.execute("SELECT * FROM usuarios WHERE matricula = %s", (identificador,))
         user = cursor.fetchone()
         
         if not user:
             cursor.execute("SELECT * FROM usuarios_admin WHERE usuario = %s", (identificador,))
             user = cursor.fetchone()
             if user:
-                user['matricula_clave'] = user['usuario']
+                user['matricula'] = user['usuario']
                 user['rol'] = 'directivo'
                 
         db.close()
@@ -120,9 +120,9 @@ def login():
                 return redirect(url_for('recuperar_password'))
 
             session['logged_in'] = True
-            session['user_id'] = user.get('id_usuario', user.get('id'))
+            session['user_id'] = user.get('id', user.get('id_usuario'))
             session['nombre'] = user['nombre']
-            session['matricula'] = user['matricula_clave']
+            session['matricula'] = user['matricula']
             session['rol'] = user['rol']
             session['seccion'] = user.get('seccion', 'N/A')
             session['correo'] = user.get('correo', '')
@@ -139,7 +139,7 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
-# --- AUTO-REGISTRO Y OTP (USANDO SESIONES BLINDADAS) ---
+# --- AUTO-REGISTRO Y OTP (ADAPTADO A TABLA 'usuarios') ---
 @app.route('/alumnos/solicitar_registro', methods=['POST'])
 def solicitar_registro():
     try:
@@ -154,12 +154,10 @@ def solicitar_registro():
             
         codigo_otp = str(random.randint(1000, 9999))
         
-        # Enviar el correo electrónico
         msg = Message("Código de Activación C.I.A. - UTC", recipients=[correo])
         msg.body = f"Hola {nombre},\n\nTu token de validación es: {codigo_otp} \n\nTienes 5 minutos para utilizarlo."
         mail.send(msg)
         
-        # Guardamos TODO en la sesión (adiós problema de memoria RAM de PythonAnywhere)
         session['registro_data'] = {
             "codigo": codigo_otp,
             "token_validado": False,
@@ -179,7 +177,6 @@ def solicitar_registro():
 @app.route('/verificar_codigo', methods=['GET', 'POST'])
 def pantalla_verificar_codigo():
     datos_registro = session.get('registro_data')
-    
     if not datos_registro:
         return redirect(url_for('login'))
         
@@ -227,28 +224,29 @@ def pantalla_asignar_password():
         nueva_contrasena = request.form.get('contrasena')
         password_cifrado = generate_password_hash(nueva_contrasena)
         
+        # Generar token y archivo QR único guardándolo en la tabla 'usuarios'
+        token_qr = f"ACCESO-{datos_registro['matricula']}-{random.randint(1000,9999)}"
+        os.makedirs("static/qrs", exist_ok=True)
+        img = qrcode.make(token_qr)
+        img.save(f"static/qrs/{token_qr}.png")
+        
         db = conectar_db()
         cursor = db.cursor()
         try:
-            # Generar token QR único para el nuevo alumno
-            token_qr = f"ACCESO-{datos_registro['matricula']}-{random.randint(1000,9999)}"
-            os.makedirs("static/qrs", exist_ok=True)
-            img = qrcode.make(token_qr)
-            img.save(f"static/qrs/{token_qr}.png")
-
             cursor.execute("""
-                INSERT INTO usuarios_sistema (matricula_clave, nombre, correo, contrasena, rol, seccion, qr_acceso) 
-                VALUES (%s, %s, %s, %s, 'alumno', %s, %s)
-            """, (datos_registro['matricula'], datos_registro['nombre'], datos_registro['correo'], password_cifrado, datos_registro['seccion'], token_qr))
+                INSERT INTO usuarios (matricula, nombre, correo, contrasena, rol, codigo_qr, primer_ingreso) 
+                VALUES (%s, %s, %s, %s, 'alumno', %s, 0)
+            """, (datos_registro['matricula'], datos_registro['nombre'], datos_registro['correo'], password_cifrado, token_qr))
             db.commit()
             
-            # Limpiamos la sesión de registro porque ya terminó exitosamente
             session.pop('registro_data', None)
             
-            flash('Cuenta activada correctamente y QR generado. Ya puedes iniciar sesión.', 'success')
+            flash('¡Cuenta creada con éxito! Tu pase QR ha sido generado. Ya puedes iniciar sesión.', 'success')
             return redirect(url_for('login'))
+            
         except mysql.connector.Error as err:
-            flash(f'Error: La matrícula o el correo ya se encuentran registrados. ({err})', 'danger')
+            db.rollback()
+            flash(f'Error al registrar en la base de datos: La matrícula o el correo ya existen. ({err})', 'danger')
             return redirect(url_for('login'))
         finally:
             db.close()
@@ -261,9 +259,9 @@ def recuperar_password():
         correo_o_user = request.form.get('identificador').strip()
         db = conectar_db()
         cursor = db.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM usuarios_sistema WHERE correo = %s OR matricula_clave = %s", (correo_o_user, correo_o_user))
+        cursor.execute("SELECT * FROM usuarios WHERE correo = %s OR matricula = %s", (correo_o_user, correo_o_user))
         usuario = cursor.fetchone()
-        tabla_origen = "usuarios_sistema"
+        tabla_origen = "usuarios"
         if not usuario:
             cursor.execute("SELECT * FROM usuarios_admin WHERE usuario = %s", (correo_o_user,))
             usuario = cursor.fetchone()
@@ -280,7 +278,7 @@ def recuperar_password():
                 
                 session['reset_data'] = {
                     "codigo": codigo_reset, 
-                    "user_id": usuario.get('id_usuario', usuario.get('id')), 
+                    "user_id": usuario.get('id', usuario.get('id_usuario')), 
                     "tabla": tabla_origen,
                     "correo": destino_correo
                 }
@@ -311,8 +309,13 @@ def confirmar_reset():
             
             db = conectar_db()
             cursor = db.cursor()
-            id_columna = "id_usuario" if datos_reset['tabla'] == "usuarios_sistema" else "id"
-            cursor.execute(f"UPDATE {datos_reset['tabla']} SET contrasena = %s, primer_ingreso = 0, qr_acceso = %s WHERE {id_columna} = %s", (password_cifrado, token_qr, datos_reset['user_id']))
+            id_columna = "id" if datos_reset['tabla'] == "usuarios" else "id"
+            
+            if datos_reset['tabla'] == "usuarios":
+                cursor.execute(f"UPDATE usuarios SET contrasena = %s, primer_ingreso = 0, codigo_qr = %s WHERE id = %s", (password_cifrado, token_qr, datos_reset['user_id']))
+            else:
+                cursor.execute(f"UPDATE usuarios_admin SET contrasena = %s, primer_ingreso = 0 WHERE id = %s", (password_cifrado, datos_reset['user_id']))
+                
             db.commit()
             db.close()
             
@@ -335,7 +338,7 @@ def dashboard_alumno():
     cursor.execute("""
         SELECT h.*, u.nombre as profesor, u.correo as correo_profesor
         FROM horarios_clases h
-        LEFT JOIN usuarios_sistema u ON h.clave_profesor = u.matricula_clave
+        LEFT JOIN usuarios u ON h.clave_profesor = u.matricula
         WHERE h.seccion = %s
     """, (session.get('seccion'),))
     horarios = cursor.fetchall()
@@ -436,7 +439,7 @@ def solicitar_adelanto():
     id_solicitud = cursor.lastrowid
     db.commit()
     
-    cursor.execute("SELECT correo FROM usuarios_sistema WHERE matricula_clave = %s", (profesor_adelanto,))
+    cursor.execute("SELECT correo FROM usuarios WHERE matricula = %s", (profesor_adelanto,))
     profe_db = cursor.fetchone()
     db.close()
 
@@ -496,8 +499,8 @@ def dashboard_directivo():
     
     try:
         cursor.execute("""
-            SELECT matricula_clave AS username, nombre, seccion 
-            FROM usuarios_sistema 
+            SELECT matricula AS username, nombre, seccion 
+            FROM usuarios 
             WHERE rol = 'alumno'
             ORDER BY nombre ASC
         """)
@@ -550,7 +553,7 @@ def registrar_docente():
     cursor = db.cursor()
     try:
         cursor.execute("""
-            INSERT INTO usuarios_sistema (matricula_clave, nombre, correo, contrasena, rol, primer_ingreso)
+            INSERT INTO usuarios (matricula, nombre, correo, contrasena, rol, primer_ingreso)
             VALUES (%s, %s, %s, %s, 'profesor', 1)
         """, (username, nombre, correo, password_cifrado))
         db.commit()
@@ -577,12 +580,6 @@ def admin_asignar_aula():
             VALUES (%s, %s, %s)
             ON DUPLICATE KEY UPDATE edificio = VALUES(edificio), salon = VALUES(salon)
         """, (seccion, edificio, salon))
-        
-        cursor.execute("""
-            UPDATE usuarios_sistema 
-            SET edificio = %s, salon_fijo = %s 
-            WHERE seccion = %s AND rol = 'alumno'
-        """, (edificio, salon, seccion))
         
         db.commit()
         db.close()
@@ -679,7 +676,7 @@ def panel_programador():
         cursor.execute("""
             SELECT a.id, a.matricula, u.nombre, a.fecha_hora, a.notas
             FROM asistencias_nfc a
-            LEFT JOIN usuarios_sistema u ON a.matricula = u.matricula_clave
+            LEFT JOIN usuarios u ON a.matricula = u.matricula
             ORDER BY a.fecha_hora DESC LIMIT 100
         """)
         lista_accesos = cursor.fetchall()
@@ -688,8 +685,8 @@ def panel_programador():
         
     try:
         cursor.execute("""
-            SELECT id_usuario AS id, matricula_clave AS username, nombre, rol, seccion, edificio, salon_fijo AS salon, tarjeta_nfc
-            FROM usuarios_sistema
+            SELECT id, matricula AS username, nombre, rol, codigo_qr AS qr, uid_nfc AS tarjeta_nfc
+            FROM usuarios
             ORDER BY rol, nombre ASC
         """)
         lista_usuarios = cursor.fetchall()
@@ -777,7 +774,7 @@ def vincular_nfc():
     db = conectar_db()
     cursor = db.cursor()
     try:
-        cursor.execute("UPDATE usuarios_sistema SET tarjeta_nfc = %s WHERE matricula_clave = %s", (uid_nfc, matricula))
+        cursor.execute("UPDATE usuarios SET uid_nfc = %s WHERE matricula = %s", (uid_nfc, matricula))
         db.commit()
         db.close()
         return jsonify({"status": "success", "mensaje": f"Llavero NFC vinculado con éxito."})
